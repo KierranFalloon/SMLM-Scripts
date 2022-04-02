@@ -1,28 +1,29 @@
 /*
  *  Automatically segements localization generated data from a results table and image
  *
- *  2022
+ *  2021 - 2022
  *  
  *  Author: Kierran Falloon
  *  University of Strathclyde, Glasgow, Scotland
- *  4th Year Mphys Physics with Advanced Research
+ *  4th Year MPhys Physics with Advanced Research
  *  
  *  Created with help and guidance from Sebastian van de Linde (s.vandelinde@strath.ac.uk)
  *  To be used in conjunction with associated python scripts to estimate precision
  *  
  */
- 
-choices = initialdialog();
+
+pixelsize = 100
+choices = initialdialog(); // Initial GUI
 operation = choices[0];
 pixelsize = choices[1];
 running =  choices[2];
 
-while(running == true){
+while(running == true){ // Checks each function if relaunch is ticked
 	if(isOpen("Results") == false) exit("Please load a localization file");
 	if(operation == "Segment"){
 		segment();
 		
-		choices = initialdialog();
+		choices = initialdialog(); // Returns to initial GUI
 		operation = choices[0];
 		pixelsize = choices[1];
 		running =  choices[2];
@@ -30,7 +31,6 @@ while(running == true){
 	if(operation == "Circularise ROIs"){
 		if(isOpen("ROI Manager") == false){
 			run("ROI Manager...");
-			roiManager("delete");
 		}
 		circularise_rois();
 		
@@ -53,7 +53,7 @@ while(running == true){
 	}
 }
 
-if(running == false){
+if(running == false){ // If relaunch is not ticked
 	if(operation == "Segment"){
 		if(isOpen("Results") == false) exit("Please load a localization file");
 		segment();
@@ -74,7 +74,7 @@ if(running == false){
 		mean_centre(pixelsize);
 	}
 	
-	run("Quit");
+	run("Quit"); // End once function selected is complete
 }
 
 /* Functions */
@@ -90,7 +90,7 @@ function initialdialog(){
 	Dialog.addMessage("Choose an operation:");
 	
 	Dialog.addChoice("Operation", items);
-	Dialog.addNumber("Pixel size [nm]", 10);
+	Dialog.addNumber("Pixel size [nm]", pixelsize);
 	Dialog.addCheckbox("Relaunch?", 1);
 	Dialog.addHelp(html);
 	
@@ -104,28 +104,19 @@ function initialdialog(){
 
 function segment(){
 	Dialog.create("Segment");
+	/*** GUI ***/
 	Dialog.addMessage("Define ROI");
 	Dialog.addCheckbox("Draw ROI", 1);
-	/***
-	Dialog.addMessage("If Draw ROI is ticked, ignore following");
-	Dialog.addNumber("x [µm]", 0);
-	Dialog.addNumber("y [µm]", 0);
-	Dialog.addNumber("w [µm]", 0);
-	Dialog.addNumber("h [µm]", 0);
-	***/
+
 	Dialog.addMessage("Threshold options:");
 	Dialog.addCheckbox("Auto Threshold", 1);
-	/***
-	Dialog.addMessage("If Auto Threshold is ticked, ignore following");
-	threshold_options = newArray("Default", "Huang");
-	Dialog.addChoice("", threshold_options);
-	Dialog.addSlider("Upper threshold", 0, 1000, 1e30);
-	Dialog.addSlider("Upper threshold", 0, 0, 0);
-	/***/
+	thresh_options = getList("threshold.methods");
+	Dialog.addChoice("Method", thresh_options);
 	Dialog.show();
 	
 	draw = Dialog.getCheckbox();
 	auto = Dialog.getCheckbox();
+	threshchoice = Dialog.getChoice();
 	if(draw == false){
 		if(auto == true){
 		Dialog.create("Options")
@@ -135,79 +126,56 @@ function segment(){
 		Dialog.addNumber("w [µm]", 0);
 		Dialog.addNumber("h [µm]", 0);
 		Dialog.show();
-		roix = Dialog.getNumber()/pixelsize;
-		roiy = Dialog.getNumber()/pixelsize;
-		roiw = Dialog.getNumber()/pixelsize;
-		roih = Dialog.getNumber()/pixelsize;
+		roix = Dialog.getNumber()*pixelsize;
+		roiy = Dialog.getNumber()*pixelsize;
+		roiw = Dialog.getNumber()*pixelsize;
+		roih = Dialog.getNumber()*pixelsize;
 	}else{
 		Dialog.create("Options")
-		threshold_options = newArray("Default", "Huang");
 		Dialog.addMessage("ROI options:");
 		Dialog.addNumber("x [µm]", 0);
 		Dialog.addNumber("y [µm]", 0);
 		Dialog.addNumber("w [µm]", 0);
 		Dialog.addNumber("h [µm]", 0);
 		Dialog.addMessage("Threshold options:");
-		Dialog.addChoice("", threshold_options);
 		Dialog.addSlider("Upper threshold", 0, 1000, 1e30);
-		Dialog.addSlider("Upper threshold", 0, 0, 0);
+		Dialog.addSlider("Lower threshold", 0, 0, 0);
 		Dialog.show();
-		roix = Dialog.getNumber()/pixelsize;
-		roiy = Dialog.getNumber()/pixelsize;
-		roiw = Dialog.getNumber()/pixelsize;
-		roih = Dialog.getNumber()/pixelsize;
-		threshchoice = Dialog.getChoice();
+		roix = (Dialog.getNumber()*1e-6)/pixelsize*1e-9;
+		roiy = (Dialog.getNumber()*1e-6)/pixelsize*1e-9;
+		roiw = (Dialog.getNumber()*1e-6)/pixelsize*1e-9;
+		roih = (Dialog.getNumber()*1e-6)/pixelsize*1e-9;
 		uthresh = Dialog.getNumber();
 		lthresh = Dialog.getNumber();
 		}
 	}
 	if(draw==true){
-		if(auto == true){
-			continue;
-		}
+		if(auto == true){ 
+		} // No GUI needed for these options
 		else{
 			
 			Dialog.create("Options")
 			Dialog.addMessage("Threshold options:");
-			threshold_options = newArray("Default", "Huang");
-			Dialog.addChoice("", threshold_options);
 			Dialog.addSlider("Upper threshold", 0, 1000, 1e30);
 			Dialog.addSlider("Upper threshold", 0, 0, 0);
 			Dialog.show();
-			threshchoice = Dialog.getChoice();
 			uthresh = Dialog.getNumber();
 			lthresh = Dialog.getNumber();
 		}
 	}
 	
-	/***
-	if(auto == false){
-		threshold_options = newArray("Default", "Huang");
-		Dialog.addChoice("", threshold_options);
-		Dialog.addSlider("Upper threshold", 0, 1000, 1e30);
-		Dialog.addSlider("Upper threshold", 0, 0, 0);
-		Dialog.show();
-		threshchoice = Dialog.getChoice();
-		uthresh = Dialog.getNumber();
-		lthresh = Dialog.getNumber();
-	}
-	***/
-	title = getTitle();
+	title = getTitle(); // General for any file name
 	selectWindow(title);
 	dupetitle = title+"_dupe";
-	run("Duplicate...", dupetitle);
+	run("Duplicate...", dupetitle); // Make copy of image
 	dupetitle = getTitle();
 	
-	if(auto == true){
-		if(threshchoice == "Default"){
-			setAutoThreshold("Default dark no-reset");
-		} else 
-			setAutoThreshold("Huang dark no-reset");
-		} else
-			if(threshchoice == "Default"){
-				setThreshold(lthresh, uthresh);
-		} else
+	if(auto == true){ // Each combination of options 
+		setAutoThreshold(threshchoice+" dark no-reset");
+		} else{
+			call("ij.plugin.frame.ThresholdAdjuster.setMethod",threshchoice);
 			setThreshold(lthresh, uthresh);
+		}
 			
 	selectWindow(dupetitle);
 	run("Create Mask");
@@ -218,7 +186,7 @@ function segment(){
 		makeRectangle(roix, roiy, roiw, roih);
 	}
 	
-	selectWindow(dupetitle);
+	selectWindow(dupetitle); 
 	run("Restore Selection");
 	run("Clear Outside");
 	run("Create Selection");
@@ -226,9 +194,11 @@ function segment(){
 	close();
 	selectWindow(dupetitle);
 	
-	keepchoice = newArray("Yes", "No");
-	Dialog.create("Keep the segment?");
-	Dialog.addChoice("", keepchoice);
+	keepchoice = newArray("Yes", "No"); // Segment validation
+	Dialog.create("Validation");
+	getThreshold(lower, upper);
+	Dialog.addMessage(threshchoice+": "+lower+"-"+upper);
+	Dialog.addChoice("Keep segment?", keepchoice);
 	Dialog.show();
 	keep = Dialog.getChoice();
 	
@@ -247,6 +217,7 @@ function segment(){
 }
 
 function circularise_rois(){
+	/*** GUI ***/
 	Dialog.create("Circularise ROIs");
 	Dialog.addMessage("Circularise ROIs");
 	Dialog.addNumber("Define sigma:", 1);
@@ -269,9 +240,10 @@ function circularise_rois(){
 
 function mean_centre(pixelsize){
 	numROIs = roiManager("count");
+	SumROIs = 0;
 		
 	f = File.open("");
-	print(f, "\"x [nm]\" "+","+ "\"y [nm]\" ");
+	print(f, "\"x [nm]\" "+","+ "\"y [nm]\"");
 	Rows = 0;
 	headings = split(Table.headings(), "\t" ); // Get table headings (different for thunderstorm and rapidstorm)
 	x = Table.getColumn(headings[2]);
@@ -320,8 +292,10 @@ function mean_centre(pixelsize){
 			if (Rows == NaN)
 				break;
 			print(f, xarray[j]+","+yarray[j]);
+			SumROIs += 1;
 		}
 	} File.close(f);
+	print("Mean localizations per ROI = "+(SumROIs / numROIs));
 } 
 
 
