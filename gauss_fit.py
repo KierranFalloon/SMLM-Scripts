@@ -24,6 +24,10 @@ def gauss_1d(x, A, meanx, sigma_x):
 
 directory = askdirectory() # Directory GUI
 number_of_files = int(input("\nHow many NPC data files are present?\n"))
+FWHM = np.zeros([number_of_files, 2])  #  NPCs, 2 FWHM values per NPC
+FWHMerr = np.zeros_like(FWHM)
+P2P = np.zeros(number_of_files)
+P2Perr = np.empty_like(P2P)
 
 start_time = perf_counter() # Start timer function
 for i in range(number_of_files):
@@ -32,8 +36,6 @@ for i in range(number_of_files):
     grays = pd.read_csv(filename, usecols=["Gray_Value"])  # y vals
     # read distance column
     distance = pd.read_csv(filename, usecols=["Distance_(µm)"])  # x vals
-    FWHM = np.zeros([10, 2])  #  NPCs, 2 FWHM values per NPC
-    P2P = np.zeros(10)
     x = np.linspace(0, np.max(distance.values[:]), 1000)
 
     HALF_SIZE = int(np.rint((len(distance.values) / 2))) + 1
@@ -61,12 +63,16 @@ for i in range(number_of_files):
 
     # Generate fit paramets for each half
     popt, pcov = curve_fit(gauss_1d, distance1, grays1, p0=[A1, mu1, std1])
+    perr = np.sqrt(np.diag(pcov)) # Errors in fit parameters as defined
     popt2, pcov2 = curve_fit(gauss_1d, distance2, grays2, p0=[A2, mu2, std2])
+    perr2 = np.sqrt(np.diag(pcov2)) # Errors in fit parameters as defined
     # Sum the Gaussians into a double Gaussian
     gauss_1dtot = gauss_1d(x, *popt) + gauss_1d(x, *popt2)
 
     FWHM[i, 0] = 2.355 * popt[2]  # Determine FWHMs
+    FWHMerr[i, 0] = 2.355 * perr[2] # Error in FWHM
     FWHM[i, 1] = 2.355 * popt2[2]
+    FWHMerr[i, 1] = 2.355 * perr2[2]
 
     P2P[i] = np.absolute((popt[1] - popt2[1])) # Determine peak to peak distance
     SEM = np.std(P2P) / np.sqrt(4) # Standard error of mean
@@ -93,9 +99,10 @@ for i in range(number_of_files):
 end_time = perf_counter()
 time_taken = end_time - start_time # Time taken
 
+
 # Print data
-print("\n --- Nuclear Pore Complex with Least Squares Fit DATA --- \n")
+print("\n --- DATA --- \n")
 print("Mean Peak-to-peak distance = {} µm".format(np.mean(P2P)))
-print("\nMean FWHM = {} µm".format(np.mean(FWHM)))
+print("\nMean FWHM = ({} ± {}) µm".format(np.mean(FWHM), np.mean(FWHMerr)))
 print("\nStandard error of the mean = {}µm\n".format(SEM))
 print("Time taken = {} s".format(time_taken))
